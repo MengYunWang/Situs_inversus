@@ -1,0 +1,56 @@
+#!/bin/sh
+#$ -N Annovar_SI_INDEL
+#$ -cwd
+#$ -q multi15.q
+#$ -S /bin/bash
+#$
+#$
+
+module load bcftools/1.18
+
+#Define directories
+Annovar=/data/workspaces/lag/workspaces/lg-sit/working_data/MengYun/code/annovar/
+working_dir=/data/workspaces/lag/workspaces/lg-sit/working_data/MengYun/data/INDEL/per_sample_all
+cd $working_dir
+
+############################################
+# Step 1: Seperate the file into each sample
+############################################
+# convert2annovar.pl -format vcf4 ../raw_variants.indel.vcf -outfile rare_variants_SI_all -allsample -withzyg  -include
+
+# # create folders for each subject
+# for i in $(seq -f "SIT%03g" 43 88); do
+   # mkdir -p "$i"                            # Create the folder named SIT043, SIT044, ..., SIT088
+   # mv *"$i".avinput "$i"/                  # Move corresponding .avinput files into the folder
+# done
+
+########################################################
+# Step 2: Put it back to the .vcf format since 
+# the .avinput has more lines than the original vcf file
+########################################################
+grep -P '^#' ../raw_variants.indel.vcf | head -n -1 > $sampleID/rare_variants_SI_all.$sampleID.vcf
+echo -e "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t$sampleID" >> $sampleID/rare_variants_SI_all.$sampleID.vcf
+#cut the columns before 9th; starting with line without #
+grep -v -P '^#' $sampleID/rare_variants_SI_all.$sampleID.avinput | cut -f 9- >> $sampleID/rare_variants_SI_all.$sampleID.vcf 
+
+###############################################
+# Step 3: Then extract the genotype data 
+# which can be pasted with the annotation file
+###############################################
+echo -e "#CHROM\tPOS\tREF\tALT\tQUAL\tInbreedingCoeff\tGT\tAD\tDP\tGQ\tPGT\tPID\tPL\tPS" > $sampleID/genotype_info.$sampleID.txt
+bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%QUAL\t%INFO/InbreedingCoeff[\t%GT\t%AD\t%DP\t%GQ\t%PGT\t%PID\t%PL\t%PS]\n' $sampleID/rare_variants_SI_all.$sampleID.vcf >> $sampleID/genotype_info.$sampleID.txt
+
+################################
+# Step 4: Run Annovar annotation
+################################
+table_annovar.pl $sampleID/rare_variants_SI_all.$sampleID.avinput $Annovar/humandb/ \
+	-buildver hg38 \
+	-out $sampleID/rare_variants_SI_all.$sampleID \
+	-protocol refGeneWithVer,ensGene,avsnp151,clinvar_20250227,dbscsnv11,GTEx_v8_sQTL,regsnpintron,gnomad41_exome,gnomad41_genome,dbnsfp47a \
+	-operation g,g,f,f,f,f,f,f,f,f \
+	-remove -polish -nastring .
+	
+##############################################################	
+# Step 5: Combine the annotated file with genotype information
+##############################################################
+paste $sampleID/rare_variants_SI_all.$sampleID.hg38_multianno.txt $sampleID/genotype_info.$sampleID.txt > $sampleID/rare_variants_SI_all.$sampleID.hg38_multianno_with_genotypes.txt
