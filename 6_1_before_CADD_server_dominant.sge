@@ -1,0 +1,28 @@
+#!/bin/sh
+#$ -N CADD_server
+#$ -cwd
+#$ -q big.q
+#$ -S /bin/bash
+#$ -M mengyun.wang@mpi.nl
+#$ -m beas
+
+
+#Define directories
+working_dir=/data/workspaces/lag/workspaces/lg-sit/working_data/MengYun/data/combined
+cd $working_dir
+
+
+#############################
+# creat vcf file for 
+# the CADD server annotation
+#############################
+
+## for the non-strict file
+#for sampleID in "${samples[@]}"; do
+for sampleID in $(seq -f "SIT%03g" 43 88); do
+	grep -P '^#' ../SNP/raw_variants.snp.vcf | head -n -1 > $sampleID/snp_indel_combined.filtered.$sampleID.dominant.vcf
+	grep -v -P '^#' $sampleID/snp_indel_combined.filtered.$sampleID.dominant.txt | cut -f 262-265 >> $sampleID/$sampleID.dominant_tmp.vcf
+	awk -F'\t' 'NR == 1 {print $1 "\t" $2 "\tID\t" $3 "\t" $4 "\t" $5; next} {print $1 "\t" $2 "\t.\t" $3 "\t" $4 "\t" $5}' $sampleID/$sampleID.dominant_tmp.vcf >> $sampleID/snp_indel_combined.filtered.$sampleID.dominant.vcf
+	rm $sampleID/$sampleID.dominant_tmp.vcf
+done
+

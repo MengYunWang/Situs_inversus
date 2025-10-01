@@ -1,0 +1,112 @@
+#!/bin/sh
+#$ -N CADD_server
+#$ -cwd
+#$ -q big.q
+#$ -S /bin/bash
+#$ -M mengyun.wang@mpi.nl
+#$ -m beas
+
+
+#Define directories
+working_dir=/data/workspaces/lag/workspaces/lg-sit/working_data/MengYun/data/combined
+cd $working_dir
+
+
+####################################
+# PartI: Add back the chrX and chrY 
+# info back for the male subjects
+####################################
+
+samples=(SIT044 SIT047 SIT048 SIT053 SIT054 SIT058 SIT059 SIT061 SIT066 SIT070 SIT073 SIT074 SIT076 SIT078 SIT082 SIT086)
+
+# for the non-strict recession file 
+for sampleID in "${samples[@]}"; do
+  input_file="${sampleID}/snp_indel_combined.filtered.${sampleID}.txt"
+  output_file="${sampleID}/snp_indel_combined.filtered.${sampleID}.recession.txt"
+  
+  # Extract rows with "chrX" or "chrY" in the first column.
+  new_rows=$(awk '$1 ~ /^chr[XY]/' "$input_file")
+   
+  # Determine the header and any existing data from the output file.
+  if [[ -f "$output_file" ]]; then
+    # Read header (first line) from the existing output file.
+    header=$(head -n 1 "$output_file")
+    # Get existing data (excluding the header).
+    existing_data=$(tail -n +2 "$output_file")
+  else
+    # If no output file exists, assume the header is the first line of the input file.
+    header=$(head -n 1 "$input_file")
+    existing_data=""
+  fi
+  
+  # Combine existing data with the new extracted rows,
+  # but exclude the header from sorting so that it remains at the top.
+  # The sorting (with uniq) is done only on the data lines.
+  combined_data=$( { echo "$existing_data"; echo "$new_rows"; } | sort -u )
+  
+  # Write the header first, then the sorted combined data, into a temporary file,
+  # and move it to replace the original output file.
+  {
+    echo "$header"
+    echo "$combined_data"
+  } > "${output_file}.tmp" && mv "${output_file}.tmp" "$output_file"
+  
+done
+
+# for the strict recession file
+for sampleID in "${samples[@]}"; do
+  input_file="${sampleID}/snp_indel_combined.filtered.${sampleID}.strict.txt"
+  output_file="${sampleID}/snp_indel_combined.filtered.${sampleID}.strict.recession.txt"
+  
+  # Extract rows with "chrX" or "chrY" in the first column.
+  new_rows=$(awk '$1 ~ /^chr[XY]/' "$input_file")
+   
+  # Determine the header and any existing data from the output file.
+  if [[ -f "$output_file" ]]; then
+    # Read header (first line) from the existing output file.
+    header=$(head -n 1 "$output_file")
+    # Get existing data (excluding the header).
+    existing_data=$(tail -n +2 "$output_file")
+  else
+    # If no output file exists, assume the header is the first line of the input file.
+    header=$(head -n 1 "$input_file")
+    existing_data=""
+  fi
+  
+  # Combine existing data with the new extracted rows,
+  # but exclude the header from sorting so that it remains at the top.
+  # The sorting (with uniq) is done only on the data lines.
+  combined_data=$( { echo "$existing_data"; echo "$new_rows"; } | sort -u )
+  
+  # Write the header first, then the sorted combined data, into a temporary file,
+  # and move it to replace the original output file.
+  {
+    echo "$header"
+    echo "$combined_data"
+  } > "${output_file}.tmp" && mv "${output_file}.tmp" "$output_file"
+  
+done
+
+
+#############################
+# PartII: creat vcf file for 
+# the CADD server annotation
+#############################
+
+## for the non-strict file
+#for sampleID in "${samples[@]}"; do
+for sampleID in $(seq -f "SIT%03g" 43 88); do
+	grep -P '^#' ../SNP/raw_variants.snp.vcf | head -n -1 > $sampleID/snp_indel_combined.filtered.$sampleID.recession.vcf
+	grep -v -P '^#' $sampleID/snp_indel_combined.filtered.$sampleID.recession.txt | cut -f 262-265 >> $sampleID/$sampleID.recession_tmp.vcf
+	awk -F'\t' 'NR == 1 {print $1 "\t" $2 "\tID\t" $3 "\t" $4 "\t" $5; next} {print $1 "\t" $2 "\t.\t" $3 "\t" $4 "\t" $5}' $sampleID/$sampleID.recession_tmp.vcf >> $sampleID/snp_indel_combined.filtered.$sampleID.recession.vcf
+	rm $sampleID/$sampleID.recession_tmp.vcf
+done
+
+## for the strict file
+#for sampleID in "${samples[@]}"; do
+for sampleID in $(seq -f "SIT%03g" 43 88); do
+	grep -P '^#' ../SNP/raw_variants.snp.vcf | head -n -1 > $sampleID/snp_indel_combined.filtered.$sampleID.strict.recession.vcf
+	grep -v -P '^#' $sampleID/snp_indel_combined.filtered.$sampleID.strict.recession.txt | cut -f 262-265 >> $sampleID/$sampleID.strict.recession_tmp.vcf
+	awk -F'\t' 'NR == 1 {print $1 "\t" $2 "\tID\t" $3 "\t" $4 "\t" $5; next} {print $1 "\t" $2 "\t.\t" $3 "\t" $4 "\t" $5}' $sampleID/$sampleID.strict.recession_tmp.vcf >> $sampleID/snp_indel_combined.filtered.$sampleID.strict.recession.vcf
+	rm $sampleID/$sampleID.strict.recession_tmp.vcf
+done

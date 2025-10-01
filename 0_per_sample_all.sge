@@ -1,0 +1,36 @@
+#!/bin/sh
+#$ -N per_sample_all
+#$ -cwd
+#$ -q fullnode15.q
+#$ -S /bin/bash
+#$ -M mengyun.wang@mpi.nl
+#$ -m beas
+
+#Define directories
+Annovar=~/software/annovar/
+
+working_dir=/data/workspaces/lag/workspaces/lg-sit/working_data/MengYun/data/SNP
+cd $working_dir
+
+# Step 1: Seperate the file into each sample
+convert2annovar.pl -format vcf4 raw_variants.snp.vcf -outfile per_sample_all/rare_variants_SI_all -allsample -withzyg  -include
+
+# create folders for each subject
+for i in $(seq -f "SIT%03g" 43 88); do
+   mkdir -p "$i"                            # Create the folder named SIT043, SIT044, ..., SIT088
+   mv *"$i".avinput "$i"/                  # Move corresponding .avinput files into the folder
+done
+
+
+working_dir=/data/workspaces/lag/workspaces/lg-sit/working_data/MengYun/data/INDEL/per_sample_all/
+cd $working_dir
+
+# Step 1: Seperate the file into each sample
+convert2annovar.pl -format vcf4 ../raw_variants.indel.vcf -outfile rare_variants_SI_all -allsample -withzyg  -include
+
+# create folders for each subject
+for i in $(seq -f "SIT%03g" 43 88); do
+    mkdir -p "$i"                            # Create the folder named SIT043, SIT044, ..., SIT088
+    mv *"$i".avinput "$i"/                  # Move corresponding .avinput files into the folder
+done
+
